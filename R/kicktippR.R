@@ -56,7 +56,7 @@ kt_odds <- get_kt_odds(kt_session)
 
 
 
-wh_session <- html_session("http://sports.williamhill.com/bet/de-de/betting/g/3647/Correct-Score.html")
+
 wh_session <- html_session("http://sports.williamhill.com/bet/de-de/betting/g/3471/Correct-Score.html")
 wh_tables <- html_nodes(wh_session, css = "table")
 
@@ -143,9 +143,9 @@ bet_team_names_cleaned <- bet_team_names
 
 
 for (text_replace in c("FSV", "SV", "FC", "04", "VfL", "1.", "Borussia",
-                       "Bor.", "96", "05", "VfB", "98", "99", "Werder", "Eintracht", "Bayer ", "M'", "MÃ¶nchen")){
-  kt_team_names_cleaned <- gsub(pattern = text_replace, x = kt_team_names_cleaned, replacement = "", ignore.case = TRUE)
-  bet_team_names_cleaned <- gsub(pattern = text_replace, x = bet_team_names_cleaned, replacement = "", ignore.case = TRUE)
+                       "Bor.", "96", "05", "VfB", "98", "99", "Werder", "Eintracht", "Bayer ", "M'", "Mönchen")){
+  kt_team_names_cleaned <- trimws(gsub(pattern = text_replace, x = kt_team_names_cleaned, replacement = "", ignore.case = TRUE))
+  bet_team_names_cleaned <- trimws(gsub(pattern = text_replace, x = bet_team_names_cleaned, replacement = "", ignore.case = TRUE))
 }
 
 match_id <- numeric()
@@ -153,11 +153,13 @@ for (i in 1:length(kt_team_names_cleaned)){
   match_id[i] <- (agrep(kt_team_names_cleaned[i], bet_team_names_cleaned, max.distance = 2))
 }
 
-mapping_table <- data.frame(kt_names = kt_team_names[match_id],
-                            bet_names = bet_team_names)
+mapping_table <- data.frame(kt_names = kt_team_names,
+                            bet_names = bet_team_names[match_id])
 
 match(tbl_bets$Home_team, mapping_table$bet_names[match(mapping_table$kt_names, kt_odds$odds_table$Heimmannschaft)])
 
+kt_session <- kt_odds$kt_session
+kt_submit_form <- html_form(kt_session)[[2]]
 
 kt_submit_home <- character()
 kt_submit_away <- character()
@@ -171,10 +173,21 @@ for (i in 1:length(kt_submit_form$fields)){
 }
 
 
+submit_list <- list()
 for (i in 1:9){
-  submit_list[[i]] <- tbl_bets$Home[match(tbl_bets$Home_team, mapping_table$bet_names[match(mapping_table$kt_names, kt_odds$odds_table$Heimmannschaft)])]
+  submit_list[[kt_submit_home[i]]] <- tbl_bets$Home[match(mapping_table$bet_names[match(kt_odds$odds_table$Heimmannschaft, mapping_table$kt_names)],tbl_bets$Home_team)][i]
+  submit_list[[kt_submit_away[i]]] <- tbl_bets$Away[match(mapping_table$bet_names[match(kt_odds$odds_table$Gastmannschaft, mapping_table$kt_names)],tbl_bets$Away_team)][i]
 }
 
 
+
+
+submit_list[["form"]] <- kt_submit_form
+
+kt_submit_form <- do.call(set_values, submit_list)
+
+kt_submit_form <- set_values(kt_submit_form, 'spieltippForms[275540044].heimTipp' = 1)
+
 try(kt_session <- submit_form(kt_session, kt_submit_form, submit = "submitbutton"), silent = TRUE)
 
+sum(tbl_bets$Exp_points)
